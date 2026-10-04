@@ -20,8 +20,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct dt_entry {
+    char            *key;   /* copied; owned by the map */
+    dt_value         value; /* owned by the environment */
+    struct dt_entry *next;  /* bucket chain */
+} dt_entry;
+
 struct dt_map {
-    int placeholder; /* TODO: Add the buckets and insertion-order data. */
+    dt_entry **buckets;
+    size_t     nbuckets;
+    dt_entry **order;      /* insertion-order array */
+    size_t     len;
+    size_t     cap;
 };
 
 /*
