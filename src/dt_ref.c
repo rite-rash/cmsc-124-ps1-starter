@@ -36,12 +36,31 @@ struct dt_ref {
 dt_ref *dt_ref_new(dt_value v)
 {
     /* TODO: Allocate the handle and cell. Copy v into the cell.
-       Set the initial release state to false.
-       dt_ref_new(dt_value_int(42))  -> a reference that prints as ref(42)
-       an allocation failure          -> NULL
+        Set the initial release state to false.
+        dt_ref_new(dt_value_int(42))  -> a reference that prints as ref(42)
+        an allocation failure          -> NULL
        cases/ownership/ref_released.case */
-    (void)v;
-    return NULL;
+
+    //allocate memory for outer handle
+    dt_ref *ref_ptr = malloc(sizeof(dt_ref));
+    if(!ref_ptr) return NULL ; //ic fail to allocaye memory
+
+    //allocate memory for cell
+    ref_ptr->cell = malloc(sizeof(dt_value));
+
+    //if memory alloc for the cell failed
+    if(!ref_ptr->cell) {
+        free(ref_ptr);
+        return NULL;
+    }
+    
+
+    //copy value to cell
+    *(ref_ptr->cell) = v;
+    //set flag to false
+    ref_ptr->released = false;
+
+    return ref_ptr;
 }
 
 /*
@@ -53,15 +72,19 @@ dt_status dt_ref_borrow(const dt_ref *p, dt_value *out)
 {
     /* TODO: Return DT_ERR_RELEASED after release.
        Otherwise, copy the cell value to *out.
-       Check the flag before you access the cell pointer.
-       a live reference to 42:  dt_ref_borrow(p, &out) -> DT_OK, *out is 42
-       after dt_ref_release(p): dt_ref_borrow(p, &out) -> DT_ERR_RELEASED,
-                                                          *out untouched
-       cases/ownership/ref_released.case,
+        Check the flag before you access the cell pointer.
+        a live reference to 42:  dt_ref_borrow(p, &out) -> DT_OK, *out is 42
+        after dt_ref_release(p): dt_ref_borrow(p, &out) -> DT_ERR_RELEASED,
+                                                            *out untouched
+        cases/ownership/ref_released.case,
        cases/post-release/borrow_after_release.case */
-    (void)p;
-    (void)out;
-    return DT_ERR_RELEASED;
+
+        if(!p || p->released ||!p->cell ||!out) return DT_ERR_RELEASED;
+
+        //copy cell value back to caller
+        *out = *(p->cell);
+        return DT_OK;
+
 }
 
 /*
@@ -71,16 +94,21 @@ dt_status dt_ref_borrow(const dt_ref *p, dt_value *out)
 dt_status dt_ref_release(dt_ref *p)
 {
     /* TODO: Return DT_ERR_RELEASED after an earlier release.
-       Otherwise, release the cell. Set the pointer to NULL. Set the release flag.
-       The NULL assignment removes the stale cell address.
-       The release flag must prevent each later access.
-       first call on a live reference   -> DT_OK and releases the cell
-       second call on the same one      -> DT_ERR_RELEASED and releases nothing
-       a reference holding a string     -> releases the cell and preserves the string
-       cases/ownership/ref_double_release.case,
+        Otherwise, release the cell. Set the pointer to NULL. Set the release flag.
+        The NULL assignment removes the stale cell address.
+        The release flag must prevent each later access.
+        first call on a live reference   -> DT_OK and releases the cell
+        second call on the same one      -> DT_ERR_RELEASED and releases nothing
+        a reference holding a string     -> releases the cell and preserves the string
+        cases/ownership/ref_double_release.case,
        cases/ownership/ref_aliases_string.case */
-    (void)p;
-    return DT_ERR_RELEASED;
+    if(!p || p->released) return DT_ERR_RELEASED;
+
+    free(p->cell);
+    p->cell = NULL;
+    p->released = true;
+
+    return DT_OK;
 }
 
 /*
@@ -90,13 +118,13 @@ dt_status dt_ref_release(dt_ref *p)
 bool dt_ref_is_released(const dt_ref *p)
 {
     /* TODO: Return the flag that dt_ref_release sets.
-       The driver checks this flag for each reference at exit.
-       A constant true result hides leaks. A constant false result reports false leaks.
-       a live reference        -> false, so the driver reports DT_ERR_LEAK
-       after dt_ref_release(p) -> true, so the driver reports no leak
+        The driver checks this flag for each reference at exit.
+        A constant true result hides leaks. A constant false result reports false leaks.
+        a live reference        -> false, so the driver reports DT_ERR_LEAK
+        after dt_ref_release(p) -> true, so the driver reports no leak
        cases/ownership/ref_never_released.case, cases/ownership/ref_released.case */
-    (void)p;
-    return true;
+    if(!p) return true;
+    return p->released;
 }
 
 /*
@@ -107,9 +135,16 @@ bool dt_ref_is_released(const dt_ref *p)
 void dt_ref_destroy(dt_ref *p)
 {
     /* TODO: Release a remaining cell. Then release the handle.
-       Do not report leaks here. The driver already completed that check.
-       a released reference  -> only the handle is left to free
-       a live reference      -> the cell and the handle both go, quietly
+        Do not report leaks here. The driver already completed that check.
+        a released reference  -> only the handle is left to free
+        a live reference      -> the cell and the handle both go, quietly
        dt_ref_destroy(NULL)  -> returns, having done nothing */
-    (void)p;
+    if(!p) return;
+    
+    if(!p->released && p->cell != NULL) {
+        free(p->cell);
+        p->cell = NULL;
+    };
+    free(p);
+
 }
