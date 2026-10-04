@@ -33,10 +33,13 @@ dt_status dt_int_add(long long a, long long b, long long *out)
        dt_int_add(2, 3, &out)          -> DT_OK, out = 5
        dt_int_add(LLONG_MAX, 1, &out)  -> DT_ERR_OVERFLOW, out untouched
        cases/normal/int_arithmetic.case, cases/boundary/int_overflow_add.case */
-    (void)a;
-    (void)b;
-    (void)out;
-    return DT_ERR_OVERFLOW;
+
+    // if b is positive, line 12, if b is negative, line 13
+    if ((b > 0 && a > LLONG_MAX - b) || (b < 0 && a < LLONG_MIN - b)) {
+        return DT_ERR_OVERFLOW;
+    }
+    *out = a + b;
+    return DT_OK;
 }
 
 /*
@@ -51,10 +54,14 @@ dt_status dt_int_sub(long long a, long long b, long long *out)
        dt_int_sub(10, 4, &out)                 -> DT_OK, out = 6
        dt_int_sub(LLONG_MIN + 1, 2, &out)      -> DT_ERR_OVERFLOW, out untouched
        cases/normal/int_arithmetic.case, cases/boundary/int_overflow_sub_min.case */
-    (void)a;
-    (void)b;
-    (void)out;
-    return DT_ERR_OVERFLOW;
+    
+    // subtracting a negative adds to a, so the result can exceed LLONG_MAX
+    // subtracting a positive can fall below LLONG_MIN.
+    if ((b < 0 && a > LLONG_MAX + b) || (b > 0 && a < LLONG_MIN + b)) {
+        return DT_ERR_OVERFLOW;
+    }
+    *out = a - b;
+    return DT_OK;
 }
 
 /*
@@ -70,8 +77,39 @@ dt_status dt_int_mul(long long a, long long b, long long *out)
        dt_int_mul(LLONG_MIN, -1, &out)   -> DT_ERR_OVERFLOW, out untouched
        cases/normal/int_arithmetic.case,
        cases/boundary/int_mul_min_by_negative_one.case */
-    (void)a;
-    (void)b;
-    (void)out;
-    return DT_ERR_OVERFLOW;
+    /* Zero is always safe: result is 0. */
+    if (a == 0 || b == 0) {
+        *out = 0;
+        return DT_OK;
+    }
+
+    /* The only "sign flip" overflow: LLONG_MIN * -1 (either order). */
+    /* this is because of assymetry in the way signed integers are represented */
+    if ((a == LLONG_MIN && b == -1) || (b == LLONG_MIN && a == -1)) {
+        return DT_ERR_OVERFLOW;
+    }
+
+    /* the meethod here is to check if a multiple will be greater/less than
+        the min/max divided by the other operand. If a falls under the
+        accepted min/max long when multipled by b, its acceeptable. */
+    /* further explanation: a * 5 < 10, the acceptable range is 0 to 2. */
+    if (a > 0) {
+        if (b > 0) {
+            if (a > LLONG_MAX / b) return DT_ERR_OVERFLOW;
+        } 
+        else { 
+            if (b < LLONG_MIN / a) return DT_ERR_OVERFLOW;
+        }
+    } 
+    else { 
+        if (b > 0) {
+            if (a < LLONG_MIN / b) return DT_ERR_OVERFLOW;
+        } 
+        else {
+            if (a < LLONG_MAX / b) return DT_ERR_OVERFLOW;
+        }
+    }
+    
+    *out = a * b;
+    return DT_OK;
 }
