@@ -19,7 +19,7 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
-      - run: chmod +x build.sh run check.sh
+      - run: chmod +x build.sh check.sh
 
       # check.sh is the complete public automated check. It builds the project
       # and runs the published corpus. It repeats the corpus with both sanitizers.
