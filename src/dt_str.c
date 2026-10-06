@@ -146,7 +146,7 @@ dt_status dt_str_append(dt_str *s, const char *bytes, size_t length)
     // if(s-> length >0 && !bytes) return DT_ERR_CAPACITY;
 
     //check for unsigned wrap around
-    if(length > SIZE_MAX -s->length +1) return DT_ERR_CAPACITY;
+    if(length > SIZE_MAX -s->length -1) return DT_ERR_CAPACITY;
 
 
     //expand length and buffer
